@@ -1,8 +1,9 @@
 resources:
 - manager.yaml
+- external-secrets.yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 images:
 - name: controller
   newName: gcr.io/pixo-bootstrap/pixo-platform-operator
-  newTag: 0.0.1
+  newTag: 0.0.3

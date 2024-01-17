@@ -73,6 +73,16 @@ spec:
         env:
           - name: LIFECYCLE
             value: "dev"
+          - name: PIXO_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: pixo-platform-credentials
+                key: username
+          - name: PIXO_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: pixo-platform-credentials
+                key: password
         image: controller:latest
         name: manager
         securityContext:
