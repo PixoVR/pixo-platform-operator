@@ -2,7 +2,7 @@
 APP_NAME ?= pixo-operator
 
 IMG ?= gcr.io/pixo-bootstrap/pixo-platform-operator
-TAG ?= 0.0.6
+TAG ?= 0.0.7
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.28.0
@@ -168,7 +168,7 @@ container:
 .PHONY: deps
 deps:
 	@echo "🔄 Updating Pixo utilities..."
-	@go get github.com/PixoVR/pixo-golang-clients/pixo-platform@0.0.123
+	@go get github.com/PixoVR/pixo-golang-clients/pixo-platform@0.0.125
 	@go mod tidy
 
 .PHONY: sample
