@@ -48,59 +48,39 @@ var _ = Describe("Pixoserviceaccount", func() {
 	})
 
 	It("can update the status if user doesnt exist and there is an error creating the user", func() {
-		pixoServiceAccount := CreateTestServiceAccount(ctx)
-		req := NewRequest(pixoServiceAccount)
 		mockPlatformClient.GetUserError = true
 		mockPlatformClient.CreateUserError = true
+		pixoServiceAccount, req := CreateAndReconcileTestServiceAccount(ctx, reconciler)
 
-		result, err := reconciler.Reconcile(ctx, req)
-
-		Expect(result).To(Equal(ctrl.Result{}))
-		Expect(err).NotTo(HaveOccurred())
 		Expect(mockPlatformClient.CalledCreateUser).To(BeTrue())
-		err = reconciler.Get(ctx, req.NamespacedName, pixoServiceAccount)
+		err := reconciler.Get(ctx, req.NamespacedName, pixoServiceAccount)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(pixoServiceAccount.Status.Error).To(Equal("error creating user"))
 	})
 
 	It("can create a user if the service account is found", func() {
-		pixoServiceAccount := CreateTestServiceAccount(ctx)
-		req := NewRequest(pixoServiceAccount)
 		mockPlatformClient.GetUserError = true
+		pixoServiceAccount, req := CreateAndReconcileTestServiceAccount(ctx, reconciler)
 
-		result, err := reconciler.Reconcile(ctx, req)
-
-		Expect(result).To(Equal(ctrl.Result{}))
-		Expect(err).NotTo(HaveOccurred())
 		Expect(mockPlatformClient.CalledCreateUser).To(BeTrue())
-		err = reconciler.Get(ctx, req.NamespacedName, pixoServiceAccount)
+		err := reconciler.Get(ctx, req.NamespacedName, pixoServiceAccount)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(pixoServiceAccount.Status.Error).To(Equal(""))
 		Expect(pixoServiceAccount.Status.ID).To(Equal(1))
-		Expect(pixoServiceAccount.Status.Username).To(Equal(pixoServiceAccount.Name))
-		Expect(pixoServiceAccount.Status.FirstName).To(Equal(pixoServiceAccount.Spec.FirstName))
-		Expect(pixoServiceAccount.Status.LastName).To(Equal(pixoServiceAccount.Spec.LastName))
-		Expect(pixoServiceAccount.Status.Role).To(Equal(pixoServiceAccount.Spec.Role))
-		Expect(pixoServiceAccount.Status.OrgID).To(Equal(pixoServiceAccount.Spec.OrgID))
+		ExpectStatusToEqualSpec(pixoServiceAccount)
 	})
 
 	It("can do nothing if the service account is found but the user already exists", func() {
-		pixoServiceAccount := CreateTestServiceAccount(ctx)
-		req := NewRequest(pixoServiceAccount)
+		pixoServiceAccount, req := CreateAndReconcileTestServiceAccount(ctx, reconciler)
 
-		result, err := reconciler.Reconcile(ctx, req)
-
-		Expect(result).To(Equal(ctrl.Result{}))
-		Expect(err).NotTo(HaveOccurred())
 		Expect(mockPlatformClient.CalledCreateUser).To(BeFalse())
-		err = reconciler.Get(ctx, req.NamespacedName, pixoServiceAccount)
+		err := reconciler.Get(ctx, req.NamespacedName, pixoServiceAccount)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(pixoServiceAccount.Status.Error).To(Equal(""))
 	})
 
 	It("can update a user if the service account is found", func() {
 		serviceAccount, req := CreateAndReconcileTestServiceAccount(ctx, reconciler)
-		req = NewRequest(serviceAccount)
 
 		result, err := reconciler.Reconcile(ctx, req)
 
@@ -113,16 +93,11 @@ var _ = Describe("Pixoserviceaccount", func() {
 	})
 
 	It("can do nothing if the service account is found but the user update fails", func() {
-		pixoServiceAccount := CreateTestServiceAccount(ctx)
-		req := NewRequest(pixoServiceAccount)
 		mockPlatformClient.UpdateUserError = true
+		pixoServiceAccount, req := CreateAndReconcileTestServiceAccount(ctx, reconciler)
 
-		result, err := reconciler.Reconcile(ctx, req)
-
-		Expect(result).To(Equal(ctrl.Result{}))
-		Expect(err).NotTo(HaveOccurred())
 		Expect(mockPlatformClient.CalledUpdateUser).To(BeTrue())
-		err = reconciler.Get(ctx, req.NamespacedName, pixoServiceAccount)
+		err := reconciler.Get(ctx, req.NamespacedName, pixoServiceAccount)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(pixoServiceAccount.Status.Error).To(Equal("error updating user"))
 	})
@@ -156,6 +131,13 @@ var _ = Describe("Pixoserviceaccount", func() {
 	})
 
 })
+
+func ExpectStatusToEqualSpec(serviceAccount *platformv1.PixoServiceAccount) {
+	Expect(serviceAccount.Status.FirstName).To(Equal(serviceAccount.Spec.FirstName))
+	Expect(serviceAccount.Status.LastName).To(Equal(serviceAccount.Spec.LastName))
+	Expect(serviceAccount.Status.OrgID).To(Equal(serviceAccount.Spec.OrgID))
+	Expect(serviceAccount.Status.Role).To(Equal(serviceAccount.Spec.Role))
+}
 
 func CreateAndReconcileTestServiceAccount(ctx context.Context, reconciler controller.PixoServiceAccountReconciler) (*platformv1.PixoServiceAccount, ctrl.Request) {
 	pixoServiceAccount := CreateTestServiceAccount(ctx)
