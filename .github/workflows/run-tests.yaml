@@ -1,5 +1,5 @@
 
-name: Run Tests
+name: Deployment Gates
 
 on:
   pull_request:
