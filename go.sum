@@ -1,7 +1,7 @@
 agones.dev/agones v1.36.0 h1:R28n+0bo0gbHflAPe4Fbd65Ui/y7StIoTppQiueRPh4=
 agones.dev/agones v1.36.0/go.mod h1:nSjtecthytiwgxu2GSDTPHXY6nyZB3cyBVSUBO6GHqo=
-github.com/PixoVR/pixo-golang-clients/pixo-platform v0.0.0-20240118082002-1d45f795d2c0 h1:VoBCNqnZMw082ls/Tu4Ib27eVX16M2Jy/nQZNF1TqwI=
-github.com/PixoVR/pixo-golang-clients/pixo-platform v0.0.0-20240118082002-1d45f795d2c0/go.mod h1:R8McS5oc3a56LWRRlni2Hc3yWaz6WEvV5ofq0KhVV7Y=
+github.com/PixoVR/pixo-golang-clients/pixo-platform v0.0.0-20240119050230-073c6e0f90df h1:fYvW1pVqIVQrq6IuusSAd/ciUx/2PHlBqJJveke2ZO0=
+github.com/PixoVR/pixo-golang-clients/pixo-platform v0.0.0-20240119050230-073c6e0f90df/go.mod h1:R8McS5oc3a56LWRRlni2Hc3yWaz6WEvV5ofq0KhVV7Y=
 github.com/PixoVR/pixo-golang-server-utilities/pixo-platform v0.0.0-20231128063312-d68e6e6b886d h1:p4DXHV2bWxGZqMbMbxX2sypFKRDZwGLwHp/CBXA4C/Q=
 github.com/PixoVR/pixo-golang-server-utilities/pixo-platform v0.0.0-20231128063312-d68e6e6b886d/go.mod h1:wy2xXEQdwb7jAQhL0CndzLwVvrf+uckydE0xGrb+fR0=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=

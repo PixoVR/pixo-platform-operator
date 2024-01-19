@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	"github.com/rs/zerolog/log"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -54,6 +55,21 @@ type PixoServiceAccount struct {
 
 	Spec   PixoServiceAccountSpec   `json:"spec,omitempty"`
 	Status PixoServiceAccountStatus `json:"status,omitempty"`
+}
+
+func (s *PixoServiceAccount) Log(msg string, err error) {
+	if err != nil {
+		log.Error().
+			Err(err).
+			Str("name", s.Name).
+			Str("namespace", s.Namespace).
+			Msg(msg)
+	}
+
+	log.Info().
+		Str("name", s.Name).
+		Str("namespace", s.Namespace).
+		Msg(msg)
 }
 
 //+kubebuilder:object:root=true

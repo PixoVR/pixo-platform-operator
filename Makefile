@@ -26,7 +26,7 @@ SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
 .PHONY: all
-all: build run
+all: build lint coverage
 
 ##@ General
 
@@ -183,7 +183,7 @@ container:
 .PHONY: deps
 deps:
 	@echo "🔄 Updating Pixo utilities..."
-	@go get github.com/PixoVR/pixo-golang-clients/pixo-platform@0.0.125
+	@go get github.com/PixoVR/pixo-golang-clients/pixo-platform@0.0.126
 	@go mod tidy
 
 .PHONY: sample

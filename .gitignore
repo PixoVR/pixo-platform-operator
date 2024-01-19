@@ -26,3 +26,5 @@ Dockerfile.cross
 *.swp
 *.swo
 *~
+
+**/report.json
