@@ -65,7 +65,22 @@ vet: ## Run go vet against code.
 
 .PHONY: test
 test: manifests generate fmt vet envtest ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./... -coverprofile cover.out
+	@echo "🧪 Running tests with coverage..."
+	@KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./... -coverprofile cover.out -covermode atomic -coverpkg ./...
+
+coverage: test
+	@echo "🧪 Checking test coverage threshold..."
+	@go-test-coverage --config=./.coverage.yaml
+
+report:
+	@echo "📊 Generating coverage report..."
+	@go tool cover -html=cover.out
+
+install-dev: golangci-lint
+	@echo "⏬️ Installing dev dependencies..."
+	@go install github.com/cosmtrek/air@latest
+	@go install github.com/vladopajic/go-test-coverage/v2@latest
+
 
 GOLANGCI_LINT = $(shell pwd)/bin/golangci-lint
 GOLANGCI_LINT_VERSION ?= v1.54.2

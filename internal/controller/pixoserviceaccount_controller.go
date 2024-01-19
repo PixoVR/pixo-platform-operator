@@ -40,8 +40,8 @@ var (
 // PixoServiceAccountReconciler reconciles a PixoServiceAccount object
 type PixoServiceAccountReconciler struct {
 	client.Client
-	Scheme         *runtime.Scheme
-	PlatformClient graphql.UsersClient
+	Scheme      *runtime.Scheme
+	UsersClient graphql.UsersClient
 }
 
 //+kubebuilder:rbac:groups=platform.pixovr.com,resources=pixoserviceaccounts,verbs=get;list;watch;create;update;patch;delete
@@ -77,7 +77,7 @@ func (r *PixoServiceAccountReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	if pixoServiceAccount.GetDeletionTimestamp() != nil {
 
-		if err := r.PlatformClient.DeleteUser(ctx, pixoServiceAccount.Status.ID); err != nil {
+		if err := r.UsersClient.DeleteUser(ctx, pixoServiceAccount.Status.ID); err != nil {
 			log.Info().
 				Int("id", pixoServiceAccount.Status.ID).
 				Msg("failed to delete user")
@@ -117,7 +117,7 @@ func (r *PixoServiceAccountReconciler) Reconcile(ctx context.Context, req ctrl.R
 		}
 	}
 
-	if user, err := r.PlatformClient.GetUserByUsername(ctx, req.Name); err == nil {
+	if user, err := r.UsersClient.GetUserByUsername(ctx, req.Name); err == nil {
 		log.Info().
 			Str("username", user.Username).
 			Msg("user already exists")
@@ -127,13 +127,13 @@ func (r *PixoServiceAccountReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	input := &platform.User{
 		Username:  req.Name,
+		Password:  faker.Password() + "!",
 		FirstName: pixoServiceAccount.Spec.FirstName,
 		LastName:  pixoServiceAccount.Spec.LastName,
 		Role:      pixoServiceAccount.Spec.Role,
-		Password:  faker.Password() + "!",
 		OrgID:     pixoServiceAccount.Spec.OrgID,
 	}
-	if user, err := r.PlatformClient.CreateUser(ctx, *input); err != nil {
+	if user, err := r.UsersClient.CreateUser(ctx, *input); err != nil {
 		log.Error().
 			Err(err).
 			Str("name", pixoServiceAccount.Name).
@@ -196,7 +196,7 @@ func (r *PixoServiceAccountReconciler) HandleUpdate(ctx context.Context, pixoSer
 	}
 
 	if shouldUpdate {
-		if user, err := r.PlatformClient.UpdateUser(ctx, *user); err != nil {
+		if user, err := r.UsersClient.UpdateUser(ctx, *user); err != nil {
 			log.Error().
 				Err(err).
 				Str("username", user.Username).
