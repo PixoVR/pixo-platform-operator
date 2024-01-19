@@ -41,7 +41,7 @@ var (
 type PixoServiceAccountReconciler struct {
 	client.Client
 	Scheme         *runtime.Scheme
-	PlatformClient *graphql.GraphQLAPIClient
+	PlatformClient graphql.UsersClient
 }
 
 //+kubebuilder:rbac:groups=platform.pixovr.com,resources=pixoserviceaccounts,verbs=get;list;watch;create;update;patch;delete
