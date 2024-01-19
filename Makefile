@@ -2,7 +2,7 @@
 APP_NAME ?= pixo-operator
 
 IMG ?= gcr.io/pixo-bootstrap/pixo-platform-operator
-TAG ?= 0.0.7
+TAG ?= 0.0.8
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.28.0
