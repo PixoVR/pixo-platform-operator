@@ -141,9 +141,7 @@ func (r *PixoServiceAccountReconciler) Reconcile(ctx context.Context, req ctrl.R
 	}
 
 	for _, deployment := range deployments.Items {
-		log.Debug().Msgf("deployment: %s", deployment.Name)
 		if serviceAccountName, ok := deployment.Annotations[AnnotationKey]; ok {
-			log.Debug().Msgf("deployment: %s has annotation %s", deployment.Name, serviceAccountName)
 			updateDeployment(&deployment, serviceAccountName)
 
 			if err = r.Update(ctx, &deployment); err != nil {
@@ -237,6 +235,17 @@ func updateDeployment(deployment *appsv1.Deployment, serviceAccountName string) 
 		{
 			Name:  "PIXO_USERNAME",
 			Value: serviceAccountName,
+		},
+		{
+			Name: "PIXO_PASSWORD",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &v1.SecretKeySelector{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: fmt.Sprintf("%s-auth", serviceAccountName),
+					},
+					Key: "password",
+				},
+			},
 		},
 	}
 

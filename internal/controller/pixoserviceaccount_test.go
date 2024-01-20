@@ -176,10 +176,14 @@ var _ = Describe("Pixoserviceaccount", func() {
 			Name:  "PIXO_USERNAME",
 			Value: serviceAccount.ObjectMeta.Name,
 		}))
-		//Expect(updatedDeployment.Spec.Template.Spec.Containers[0].Env).To(ContainElement(corev1.EnvVar{
-		//	Name:  "PIXO_USER_ID",
-		//	Value: fmt.Sprint(serviceAccount.Status.ID),
-		//}))
+		envVars := updatedDeployment.Spec.Template.Spec.Containers[0].Env
+		foundPassword := false
+		for _, envVar := range envVars {
+			if envVar.Name == "PIXO_PASSWORD" {
+				foundPassword = true
+			}
+		}
+		Expect(foundPassword).To(BeTrue())
 	})
 
 })
