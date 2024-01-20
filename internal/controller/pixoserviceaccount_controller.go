@@ -53,6 +53,8 @@ type PixoServiceAccountReconciler struct {
 //+kubebuilder:rbac:groups=platform.pixovr.com,resources=pixoserviceaccounts/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=platform.pixovr.com,resources=pixoserviceaccounts/finalizers,verbs=update
 //+kubebuilder:rbac:groups=platform.pixovr.com,resources=secrets,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=platform.pixovr.com,resources=secrets/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;update;patch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -144,7 +146,7 @@ func (r *PixoServiceAccountReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	for _, deployment := range deployments.Items {
 		if serviceAccountName, ok := deployment.Annotations[AnnotationKey]; ok && serviceAccountName == req.Name {
-			updateDeployment(&deployment, serviceAccountName)
+			addOrUpdateEnvVars(&deployment, serviceAccountName)
 
 			if err = r.Update(ctx, &deployment); err != nil {
 				return ctrl.Result{}, r.UpdateStatus(ctx, serviceAccount, "failed to update deployment with auth creds", user, err)
@@ -235,7 +237,7 @@ func containsString(slice []string, s string) bool {
 	return false
 }
 
-func updateDeployment(deployment *appsv1.Deployment, serviceAccountName string) {
+func addOrUpdateEnvVars(deployment *appsv1.Deployment, serviceAccountName string) {
 	log.Debug().Msgf("updating deployment: %s", deployment.Name)
 
 	envVars := []corev1.EnvVar{
@@ -257,7 +259,18 @@ func updateDeployment(deployment *appsv1.Deployment, serviceAccountName string) 
 	}
 
 	for i, container := range deployment.Spec.Template.Spec.Containers {
-		container.Env = append(container.Env, envVars...)
+		for _, envVar := range envVars {
+			exists := false
+			for j, existingEnvVar := range container.Env {
+				if existingEnvVar.Name == envVar.Name {
+					exists = true
+					container.Env[j] = envVar
+				}
+			}
+			if !exists {
+				container.Env = append(container.Env, envVar)
+			}
+		}
 		deployment.Spec.Template.Spec.Containers[i] = container
 	}
 }
