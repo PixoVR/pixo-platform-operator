@@ -39,7 +39,7 @@ var (
 )
 
 const (
-	AnnotationKey = "pixo-platform/service-account-name"
+	AnnotationKey = "platform.pixovr.com/service-account-name"
 )
 
 // PixoServiceAccountReconciler reconciles a PixoServiceAccount object
@@ -67,7 +67,6 @@ func (r *PixoServiceAccountReconciler) Reconcile(ctx context.Context, req ctrl.R
 			return ctrl.Result{}, nil
 		}
 
-		serviceAccount.Log("failed to get service account", err)
 		return ctrl.Result{}, err
 	}
 
@@ -80,8 +79,7 @@ func (r *PixoServiceAccountReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 		serviceAccount.SetFinalizers(removeString(serviceAccount.GetFinalizers(), finalizerName))
 		if err := r.Update(ctx, serviceAccount); err != nil {
-			msg := "failed to remove finalizer"
-			return ctrl.Result{}, r.UpdateStatus(ctx, serviceAccount, msg, nil, err)
+			return ctrl.Result{}, r.UpdateStatus(ctx, serviceAccount, "failed to remove finalizer", nil, err)
 		}
 
 		return ctrl.Result{}, nil
@@ -91,46 +89,50 @@ func (r *PixoServiceAccountReconciler) Reconcile(ctx context.Context, req ctrl.R
 		serviceAccount.SetFinalizers(append(serviceAccount.GetFinalizers(), finalizerName))
 
 		if err := r.Update(ctx, serviceAccount); err != nil {
-			msg := "failed to add finalizer"
-			return ctrl.Result{}, r.UpdateStatus(ctx, serviceAccount, msg, nil, err)
+			return ctrl.Result{}, r.UpdateStatus(ctx, serviceAccount, "failed to add finalizer", nil, err)
 		}
 	}
 
-	if user, err := r.UsersClient.GetUserByUsername(ctx, req.Name); err == nil {
-		serviceAccount.Log("user already exists", nil)
-		return ctrl.Result{}, r.HandleUpdate(ctx, serviceAccount, user)
-	}
+	var msg string
+	var user *platform.User
+	var err error
 
-	input := &platform.User{
-		Username:  req.Name,
-		Password:  faker.Password() + "!",
-		FirstName: serviceAccount.Spec.FirstName,
-		LastName:  serviceAccount.Spec.LastName,
-		Role:      serviceAccount.Spec.Role,
-		OrgID:     serviceAccount.Spec.OrgID,
-	}
-	user, err := r.UsersClient.CreateUser(ctx, *input)
-	if err != nil {
-		return ctrl.Result{}, r.UpdateStatus(ctx, serviceAccount, "failed to create pixo user account", user, err)
-	}
+	if user, err = r.UsersClient.GetUserByUsername(ctx, req.Name); err == nil {
+		if err = r.HandleUpdate(ctx, serviceAccount, user); err != nil {
+			return ctrl.Result{}, err
+		}
+	} else {
+		input := &platform.User{
+			Username:  req.Name,
+			Password:  faker.Password() + "!",
+			FirstName: serviceAccount.Spec.FirstName,
+			LastName:  serviceAccount.Spec.LastName,
+			Role:      serviceAccount.Spec.Role,
+			OrgID:     serviceAccount.Spec.OrgID,
+		}
+		user, err = r.UsersClient.CreateUser(ctx, *input)
+		if err != nil {
+			return ctrl.Result{}, r.UpdateStatus(ctx, serviceAccount, "failed to create pixo user account", user, err)
+		}
+		msg = "successfully created user"
 
-	secret := &v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-auth", req.Name),
-			Namespace: req.Namespace,
-		},
-		StringData: map[string]string{
-			"username": req.Name,
-			"password": input.Password,
-		},
-		Type: v1.SecretTypeOpaque,
-	}
+		secret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("%s-auth", req.Name),
+				Namespace: req.Namespace,
+			},
+			StringData: map[string]string{
+				"username": req.Name,
+				"password": input.Password,
+			},
+			Type: v1.SecretTypeOpaque,
+		}
 
-	// see if secret exists
-	if err = r.Get(ctx, client.ObjectKeyFromObject(secret), secret); err != nil {
-		if errors.IsNotFound(err) {
-			if err = r.Create(ctx, secret); err != nil {
-				return ctrl.Result{}, r.UpdateStatus(ctx, serviceAccount, "failed to create auth secret", user, err)
+		if err = r.Get(ctx, client.ObjectKeyFromObject(secret), secret); err != nil {
+			if errors.IsNotFound(err) {
+				if err = r.Create(ctx, secret); err != nil {
+					return ctrl.Result{}, r.UpdateStatus(ctx, serviceAccount, "failed to create auth secret", user, err)
+				}
 			}
 		}
 	}
@@ -141,7 +143,7 @@ func (r *PixoServiceAccountReconciler) Reconcile(ctx context.Context, req ctrl.R
 	}
 
 	for _, deployment := range deployments.Items {
-		if serviceAccountName, ok := deployment.Annotations[AnnotationKey]; ok {
+		if serviceAccountName, ok := deployment.Annotations[AnnotationKey]; ok && serviceAccountName == req.Name {
 			updateDeployment(&deployment, serviceAccountName)
 
 			if err = r.Update(ctx, &deployment); err != nil {
@@ -150,7 +152,7 @@ func (r *PixoServiceAccountReconciler) Reconcile(ctx context.Context, req ctrl.R
 		}
 	}
 
-	return ctrl.Result{}, r.UpdateStatus(ctx, serviceAccount, "created pixo user account", user, nil)
+	return ctrl.Result{}, r.UpdateStatus(ctx, serviceAccount, msg, user, err)
 }
 
 func (r *PixoServiceAccountReconciler) HandleUpdate(ctx context.Context, pixoServiceAccount *platformv1.PixoServiceAccount, user *platform.User) error {
@@ -205,7 +207,12 @@ func (r *PixoServiceAccountReconciler) UpdateStatus(ctx context.Context, pixoSer
 		pixoServiceAccount.Status.Error = ""
 	}
 
-	return r.Status().Update(ctx, pixoServiceAccount)
+	if updateErr := r.Status().Update(ctx, pixoServiceAccount); updateErr != nil {
+		pixoServiceAccount.Log("failed to update status", updateErr)
+		return updateErr
+	}
+
+	return err
 }
 
 // SetupWithManager sets up the controller with the Manager.
