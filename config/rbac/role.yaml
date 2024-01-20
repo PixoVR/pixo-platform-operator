@@ -5,6 +5,18 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
+  - ""
+  resources:
+  - secrets/status
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - apps
   resources:
   - deployments
@@ -36,26 +48,6 @@ rules:
   - platform.pixovr.com
   resources:
   - pixoserviceaccounts/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - platform.pixovr.com
-  resources:
-  - secrets
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - platform.pixovr.com
-  resources:
-  - secrets/status
   verbs:
   - get
   - patch
