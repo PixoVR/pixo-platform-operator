@@ -22,18 +22,24 @@ import (
 	graphql "github.com/PixoVR/pixo-golang-clients/pixo-platform/graphql-api"
 	platform "github.com/PixoVR/pixo-golang-clients/pixo-platform/primary-api"
 	"github.com/go-faker/faker/v4"
+	"github.com/rs/zerolog/log"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	platformv1 "pixovr.com/platform/api/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	platformv1 "pixovr.com/platform/api/v1"
 )
 
 var (
 	finalizerName = "serviceaccount.platform.pixovr.com"
+)
+
+const (
+	AnnotationKey = "pixo-platform/service-account-name"
 )
 
 // PixoServiceAccountReconciler reconciles a PixoServiceAccount object
@@ -120,9 +126,30 @@ func (r *PixoServiceAccountReconciler) Reconcile(ctx context.Context, req ctrl.R
 		Type: v1.SecretTypeOpaque,
 	}
 
-	if err := r.Client.Create(ctx, secret); err != nil {
-		msg := fmt.Sprintf("failed to create secret: %s", secret.Name)
-		return ctrl.Result{}, r.UpdateStatus(ctx, serviceAccount, msg, nil, err)
+	// see if secret exists
+	if err = r.Get(ctx, client.ObjectKeyFromObject(secret), secret); err != nil {
+		if errors.IsNotFound(err) {
+			if err = r.Create(ctx, secret); err != nil {
+				return ctrl.Result{}, r.UpdateStatus(ctx, serviceAccount, "failed to create auth secret", user, err)
+			}
+		}
+	}
+
+	deployments := appsv1.DeploymentList{}
+	if err = r.List(ctx, &deployments, client.InNamespace(req.Namespace)); err != nil {
+		return ctrl.Result{}, r.UpdateStatus(ctx, serviceAccount, "failed to list deployments", user, err)
+	}
+
+	for _, deployment := range deployments.Items {
+		log.Debug().Msgf("deployment: %s", deployment.Name)
+		if serviceAccountName, ok := deployment.Annotations[AnnotationKey]; ok {
+			log.Debug().Msgf("deployment: %s has annotation %s", deployment.Name, serviceAccountName)
+			updateDeployment(&deployment, serviceAccountName)
+
+			if err = r.Update(ctx, &deployment); err != nil {
+				return ctrl.Result{}, r.UpdateStatus(ctx, serviceAccount, "failed to update deployment with auth creds", user, err)
+			}
+		}
 	}
 
 	return ctrl.Result{}, r.UpdateStatus(ctx, serviceAccount, "created pixo user account", user, nil)
@@ -201,4 +228,20 @@ func containsString(slice []string, s string) bool {
 		}
 	}
 	return false
+}
+
+func updateDeployment(deployment *appsv1.Deployment, serviceAccountName string) {
+	log.Debug().Msgf("updating deployment: %s", deployment.Name)
+
+	envVars := []corev1.EnvVar{
+		{
+			Name:  "PIXO_USERNAME",
+			Value: serviceAccountName,
+		},
+	}
+
+	for i, container := range deployment.Spec.Template.Spec.Containers {
+		container.Env = append(container.Env, envVars...)
+		deployment.Spec.Template.Spec.Containers[i] = container
+	}
 }

@@ -46,7 +46,7 @@ var (
 	cfg       *rest.Config
 	k8sClient client.Client
 	testEnv   *envtest.Environment
-	namespace = "test"
+	Namespace = "test"
 )
 
 func TestControllers(t *testing.T) {
@@ -88,7 +88,7 @@ var _ = BeforeSuite(func() {
 
 	err = k8sClient.Create(context.Background(), &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: namespace,
+			Name: Namespace,
 		},
 	})
 	Expect(err).NotTo(HaveOccurred())
