@@ -141,7 +141,7 @@ var _ = Describe("Pixoserviceaccount", func() {
 		Expect(pixoServiceAccount.Status.Error).To(Equal("error deleting user"))
 	})
 
-	It("should add environment variables only once if the correct annotation is present", func() {
+	It("should add environment variables if the correct annotation is present", func() {
 		mockPlatformClient.GetUserError = true
 		serviceAccount, err, req := CreateAndReconcileTestServiceAccount(ctx, reconciler, Namespace)
 		Expect(err).NotTo(HaveOccurred())

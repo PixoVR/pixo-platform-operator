@@ -75,8 +75,7 @@ func (r *PixoServiceAccountReconciler) Reconcile(ctx context.Context, req ctrl.R
 	if serviceAccount.GetDeletionTimestamp() != nil {
 
 		if err := r.UsersClient.DeleteUser(ctx, serviceAccount.Status.ID); err != nil {
-			msg := "failed to delete user"
-			return ctrl.Result{}, r.UpdateStatus(ctx, serviceAccount, msg, nil, err)
+			return ctrl.Result{}, r.UpdateStatus(ctx, serviceAccount, "failed to delete user", nil, err)
 		}
 
 		serviceAccount.SetFinalizers(removeString(serviceAccount.GetFinalizers(), finalizerName))
@@ -193,25 +192,29 @@ func (r *PixoServiceAccountReconciler) UpdateStatus(ctx context.Context, pixoSer
 
 	pixoServiceAccount.Log(msg, err)
 
+	psa := &platformv1.PixoServiceAccount{}
+	if getErr := r.Get(ctx, client.ObjectKeyFromObject(pixoServiceAccount), psa); getErr != nil {
+		return getErr
+	}
+
 	if err != nil {
-		pixoServiceAccount.Status.Error = err.Error()
+		psa.Status.Error = err.Error()
 	} else {
-		pixoServiceAccount.Status.Error = ""
+		psa.Status.Error = ""
 	}
 
 	if user != nil {
-		pixoServiceAccount.Status.ID = user.ID
-		pixoServiceAccount.Status.Username = user.Username
-		pixoServiceAccount.Status.FirstName = user.FirstName
-		pixoServiceAccount.Status.LastName = user.LastName
-		pixoServiceAccount.Status.OrgID = user.OrgID
-		pixoServiceAccount.Status.Role = user.Role
-		pixoServiceAccount.Status.Error = ""
+		psa.Status.ID = user.ID
+		psa.Status.Username = user.Username
+		psa.Status.FirstName = user.FirstName
+		psa.Status.LastName = user.LastName
+		psa.Status.OrgID = user.OrgID
+		psa.Status.Role = user.Role
+		psa.Status.Error = ""
 	}
 
-	if updateErr := r.Status().Update(ctx, pixoServiceAccount); updateErr != nil {
+	if updateErr := r.Status().Update(ctx, psa); updateErr != nil {
 		pixoServiceAccount.Log("failed to update status", updateErr)
-		return updateErr
 	}
 
 	return err
