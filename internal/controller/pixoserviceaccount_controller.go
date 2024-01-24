@@ -73,8 +73,22 @@ func (r *PixoServiceAccountReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	if serviceAccount.GetDeletionTimestamp() != nil {
 
+		if err := r.PlatformClient.DeleteAPIKey(ctx, serviceAccount.Status.APIKeyID); err != nil {
+			return ctrl.Result{}, r.UpdateStatus(ctx, serviceAccount, "failed to delete api key", nil, err)
+		}
+
 		if err := r.PlatformClient.DeleteUser(ctx, serviceAccount.Status.ID); err != nil {
 			return ctrl.Result{}, r.UpdateStatus(ctx, serviceAccount, "failed to delete user", nil, err)
+		}
+
+		secret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("%s-auth", req.Name),
+				Namespace: req.Namespace,
+			},
+		}
+		if err := r.Delete(ctx, secret); err != nil {
+			return ctrl.Result{}, r.UpdateStatus(ctx, serviceAccount, "failed to delete auth secret", nil, err)
 		}
 
 		serviceAccount.SetFinalizers(removeString(serviceAccount.GetFinalizers(), finalizerName))
@@ -82,7 +96,7 @@ func (r *PixoServiceAccountReconciler) Reconcile(ctx context.Context, req ctrl.R
 			return ctrl.Result{}, r.UpdateStatus(ctx, serviceAccount, "failed to remove finalizer", nil, err)
 		}
 
-		return ctrl.Result{}, nil
+		return ctrl.Result{}, r.UpdateStatus(ctx, serviceAccount, "deleted user and api key", nil, nil)
 	}
 
 	if !containsString(serviceAccount.GetFinalizers(), finalizerName) {
@@ -119,6 +133,11 @@ func (r *PixoServiceAccountReconciler) Reconcile(ctx context.Context, req ctrl.R
 		apiKey, err := r.PlatformClient.CreateAPIKey(ctx, platform.APIKey{UserID: user.ID})
 		if err != nil {
 			return ctrl.Result{}, r.UpdateStatus(ctx, serviceAccount, "failed to create api key", user, err)
+		}
+
+		serviceAccount.Status.APIKeyID = apiKey.ID
+		if err = r.UpdateStatus(ctx, serviceAccount, "created api key", user, nil); err != nil {
+			return ctrl.Result{}, err
 		}
 
 		secret := &v1.Secret{
@@ -193,13 +212,19 @@ func (r *PixoServiceAccountReconciler) HandleUpdate(ctx context.Context, pixoSer
 	return r.UpdateStatus(ctx, pixoServiceAccount, "updated user", user, nil)
 }
 
-func (r *PixoServiceAccountReconciler) UpdateStatus(ctx context.Context, pixoServiceAccount *platformv1.PixoServiceAccount, msg string, user *platform.User, err error) error {
+func (r *PixoServiceAccountReconciler) UpdateStatus(ctx context.Context, serviceAccount *platformv1.PixoServiceAccount, msg string, user *platform.User, err error) error {
 
-	pixoServiceAccount.Log(msg, err)
+	serviceAccount.Log(msg, err)
 
 	psa := &platformv1.PixoServiceAccount{}
-	if getErr := r.Get(ctx, client.ObjectKeyFromObject(pixoServiceAccount), psa); getErr != nil {
-		return getErr
+
+	if getErr := r.Get(ctx, client.ObjectKeyFromObject(serviceAccount), psa); getErr != nil {
+		log.Debug().Msgf("no service account found: %s", getErr.Error())
+		return nil
+	}
+
+	if serviceAccount.Status.APIKeyID != 0 {
+		psa.Status.APIKeyID = serviceAccount.Status.APIKeyID
 	}
 
 	if err != nil {
@@ -219,7 +244,7 @@ func (r *PixoServiceAccountReconciler) UpdateStatus(ctx context.Context, pixoSer
 	}
 
 	if updateErr := r.Status().Update(ctx, psa); updateErr != nil {
-		pixoServiceAccount.Log("failed to update status", updateErr)
+		serviceAccount.Log("failed to update status", updateErr)
 	}
 
 	return err

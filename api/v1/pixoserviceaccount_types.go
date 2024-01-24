@@ -34,13 +34,15 @@ type PixoServiceAccountSpec struct {
 
 // PixoServiceAccountStatus defines the observed state of PixoServiceAccount
 type PixoServiceAccountStatus struct {
-	ID        int         `json:"id,omitempty"`
-	FirstName string      `json:"firstName,omitempty"`
-	LastName  string      `json:"lastName,omitempty"`
-	Username  string      `json:"username,omitempty"`
-	OrgID     int         `json:"orgId,omitempty"`
-	Role      string      `json:"role,omitempty"`
-	Error     string      `json:"error,omitempty"`
+	ID        int    `json:"id,omitempty"`
+	FirstName string `json:"firstName,omitempty"`
+	LastName  string `json:"lastName,omitempty"`
+	Username  string `json:"username,omitempty"`
+	OrgID     int    `json:"orgId,omitempty"`
+	Role      string `json:"role,omitempty"`
+	APIKeyID  int    `json:"apiKeyId,omitempty"`
+	Error     string `json:"error,omitempty"`
+
 	CreatedAt metav1.Time `json:"createdAt,omitempty"`
 	UpdatedAt metav1.Time `json:"updatedAt,omitempty"`
 }

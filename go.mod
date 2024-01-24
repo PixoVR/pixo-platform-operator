@@ -5,7 +5,7 @@ go 1.21
 toolchain go1.21.5
 
 require (
-	github.com/PixoVR/pixo-golang-clients/pixo-platform v0.0.0-20240124060115-7fdb1b364f9d
+	github.com/PixoVR/pixo-golang-clients/pixo-platform v0.0.0-20240124070145-402defe7a61f
 	github.com/PixoVR/pixo-golang-server-utilities/pixo-platform v0.0.0-20231128063312-d68e6e6b886d
 	github.com/go-faker/faker/v4 v4.2.0
 	github.com/joho/godotenv v1.5.1

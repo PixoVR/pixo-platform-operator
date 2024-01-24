@@ -10,15 +10,15 @@ local-prefix: "github.com/PixoVR/pixo-platform-operator"
 threshold:
   # (optional; default 0)
   # The minimum coverage that each file should have
-  file: 85
+  file: 88
 
   # (optional; default 0)
   # The minimum coverage that each package should have
-  package: 85
+  package: 88
 
   # (optional; default 0)
   # The minimum total coverage project should have
-  total: 85
+  total: 88
 
   # Holds regexp rules which will override thresholds for matched files or packages using their paths.
   #

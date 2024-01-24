@@ -99,14 +99,11 @@ func main() {
 	}
 
 	clientConfig := urlfinder.ClientConfig{
+		Key:       os.Getenv("PIXO_API_KEY"),
 		Lifecycle: config.GetLifecycle(),
 		Internal:  config.GetLifecycle() != "local",
 	}
-	platformClient, err := graphql.NewClientWithBasicAuth(os.Getenv("PIXO_USERNAME"), os.Getenv("PIXO_PASSWORD"), clientConfig)
-	if err != nil {
-		setupLog.Error(err, "unable to create graphql client")
-		os.Exit(1)
-	}
+	platformClient := graphql.NewClient(clientConfig)
 
 	if err = (&controller.PixoServiceAccountReconciler{
 		Client:         mgr.GetClient(),

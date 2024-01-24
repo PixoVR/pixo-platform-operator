@@ -46,6 +46,7 @@ var (
 	cfg       *rest.Config
 	k8sClient client.Client
 	testEnv   *envtest.Environment
+
 	Namespace = "test"
 )
 
