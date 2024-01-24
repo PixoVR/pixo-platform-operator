@@ -45,8 +45,8 @@ const (
 // PixoServiceAccountReconciler reconciles a PixoServiceAccount object
 type PixoServiceAccountReconciler struct {
 	client.Client
-	Scheme      *runtime.Scheme
-	UsersClient graphql.UsersClient
+	Scheme         *runtime.Scheme
+	PlatformClient graphql.PlatformClient
 }
 
 //+kubebuilder:rbac:groups=platform.pixovr.com,resources=pixoserviceaccounts,verbs=get;list;watch;create;update;patch;delete
@@ -73,7 +73,7 @@ func (r *PixoServiceAccountReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	if serviceAccount.GetDeletionTimestamp() != nil {
 
-		if err := r.UsersClient.DeleteUser(ctx, serviceAccount.Status.ID); err != nil {
+		if err := r.PlatformClient.DeleteUser(ctx, serviceAccount.Status.ID); err != nil {
 			return ctrl.Result{}, r.UpdateStatus(ctx, serviceAccount, "failed to delete user", nil, err)
 		}
 
@@ -97,7 +97,7 @@ func (r *PixoServiceAccountReconciler) Reconcile(ctx context.Context, req ctrl.R
 	var user *platform.User
 	var err error
 
-	if user, err = r.UsersClient.GetUserByUsername(ctx, req.Name); err == nil {
+	if user, err = r.PlatformClient.GetUserByUsername(ctx, req.Name); err == nil {
 		if err = r.HandleUpdate(ctx, serviceAccount, user); err != nil {
 			return ctrl.Result{}, err
 		}
@@ -110,11 +110,16 @@ func (r *PixoServiceAccountReconciler) Reconcile(ctx context.Context, req ctrl.R
 			Role:      serviceAccount.Spec.Role,
 			OrgID:     serviceAccount.Spec.OrgID,
 		}
-		user, err = r.UsersClient.CreateUser(ctx, *input)
+		user, err = r.PlatformClient.CreateUser(ctx, *input)
 		if err != nil {
 			return ctrl.Result{}, r.UpdateStatus(ctx, serviceAccount, "failed to create pixo user account", user, err)
 		}
 		msg = "successfully created user"
+
+		apiKey, err := r.PlatformClient.CreateAPIKey(ctx, platform.APIKey{UserID: user.ID})
+		if err != nil {
+			return ctrl.Result{}, r.UpdateStatus(ctx, serviceAccount, "failed to create api key", user, err)
+		}
 
 		secret := &v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -124,6 +129,7 @@ func (r *PixoServiceAccountReconciler) Reconcile(ctx context.Context, req ctrl.R
 			StringData: map[string]string{
 				"username": req.Name,
 				"password": input.Password,
+				"api-key":  apiKey.Key,
 			},
 			Type: v1.SecretTypeOpaque,
 		}
@@ -179,7 +185,7 @@ func (r *PixoServiceAccountReconciler) HandleUpdate(ctx context.Context, pixoSer
 	}
 
 	if shouldUpdate {
-		if user, err := r.UsersClient.UpdateUser(ctx, *user); err != nil {
+		if user, err := r.PlatformClient.UpdateUser(ctx, *user); err != nil {
 			return r.UpdateStatus(ctx, pixoServiceAccount, "failed to update user", user, err)
 		}
 	}
@@ -255,6 +261,17 @@ func addOrUpdateEnvVars(deployment *appsv1.Deployment, serviceAccountName string
 						Name: fmt.Sprintf("%s-auth", serviceAccountName),
 					},
 					Key: "password",
+				},
+			},
+		},
+		{
+			Name: "PIXO_API_KEY",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &v1.SecretKeySelector{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: fmt.Sprintf("%s-auth", serviceAccountName),
+					},
+					Key: "api-key",
 				},
 			},
 		},

@@ -109,9 +109,9 @@ func main() {
 	}
 
 	if err = (&controller.PixoServiceAccountReconciler{
-		Client:      mgr.GetClient(),
-		Scheme:      mgr.GetScheme(),
-		UsersClient: platformClient,
+		Client:         mgr.GetClient(),
+		Scheme:         mgr.GetScheme(),
+		PlatformClient: platformClient,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PixoServiceAccount")
 		os.Exit(1)

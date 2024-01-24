@@ -29,8 +29,8 @@ var _ = Describe("Pixoserviceaccount", func() {
 		ctx = context.Background()
 		mockPlatformClient = &graphql_api.MockGraphQLClient{}
 		reconciler = controller.PixoServiceAccountReconciler{
-			Client:      k8sClient,
-			UsersClient: mockPlatformClient,
+			Client:         k8sClient,
+			PlatformClient: mockPlatformClient,
 		}
 	})
 
@@ -68,6 +68,7 @@ var _ = Describe("Pixoserviceaccount", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		Expect(mockPlatformClient.CalledCreateUser).To(BeTrue())
+		Expect(mockPlatformClient.CalledCreateAPIKey).To(BeTrue())
 		err = reconciler.Get(ctx, req.NamespacedName, pixoServiceAccount)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(pixoServiceAccount.Status.Error).To(Equal(""))
@@ -146,6 +147,7 @@ var _ = Describe("Pixoserviceaccount", func() {
 		serviceAccount, err, req := CreateAndReconcileTestServiceAccount(ctx, reconciler, Namespace)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(mockPlatformClient.CalledCreateUser).To(BeTrue())
+		Expect(mockPlatformClient.CalledCreateAPIKey).To(BeTrue())
 		deployment := NewTestDeployment(Namespace, "test-deployment", serviceAccount.ObjectMeta.Name)
 		Expect(reconciler.Create(ctx, deployment)).Should(Succeed())
 
@@ -181,19 +183,24 @@ var _ = Describe("Pixoserviceaccount", func() {
 
 func ExpectEnvVarsToExist(deployment v1.Deployment, serviceAccount *platformv1.PixoServiceAccount) {
 	Expect(deployment.Spec.Template.Spec.Containers).To(HaveLen(1))
-	Expect(deployment.Spec.Template.Spec.Containers[0].Env).To(HaveLen(2))
+	Expect(deployment.Spec.Template.Spec.Containers[0].Env).To(HaveLen(3))
 	Expect(deployment.Spec.Template.Spec.Containers[0].Env).To(ContainElement(corev1.EnvVar{
 		Name:  "PIXO_USERNAME",
 		Value: serviceAccount.ObjectMeta.Name,
 	}))
-	envVars := deployment.Spec.Template.Spec.Containers[0].Env
-	foundPassword := false
-	for _, envVar := range envVars {
-		if envVar.Name == "PIXO_PASSWORD" {
-			foundPassword = true
+	ExpectEnvVarsToContain(deployment, "PIXO_PASSWORD")
+	ExpectEnvVarsToContain(deployment, "PIXO_API_KEY")
+}
+
+func ExpectEnvVarsToContain(deployment v1.Deployment, key string) {
+	Expect(len(deployment.Spec.Template.Spec.Containers)).To(BeNumerically(">", 0))
+	found := false
+	for _, envVar := range deployment.Spec.Template.Spec.Containers[0].Env {
+		if envVar.Name == key {
+			found = true
 		}
 	}
-	Expect(foundPassword).To(BeTrue())
+	Expect(found).To(BeTrue())
 }
 
 func ExpectStatusToEqualSpec(serviceAccount *platformv1.PixoServiceAccount) {

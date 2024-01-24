@@ -183,7 +183,7 @@ container:
 .PHONY: deps
 deps:
 	@echo "🔄 Updating Pixo utilities..."
-	@go get github.com/PixoVR/pixo-golang-clients/pixo-platform@0.0.126
+	@go get github.com/PixoVR/pixo-golang-clients/pixo-platform@0.0.131
 	@go mod tidy
 
 .PHONY: sample
