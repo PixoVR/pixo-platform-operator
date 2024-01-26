@@ -72,7 +72,7 @@ func (r *PixoServiceAccountReconciler) Reconcile(ctx context.Context, req ctrl.R
 			return ctrl.Result{}, err
 		}
 
-		return ctrl.Result{}, r.HandleStatusUpdate(ctx, serviceAccount, "deleted user and api key", nil, nil)
+		return ctrl.Result{}, r.HandleStatusUpdate(ctx, serviceAccount, "deleted user and api key", 0, nil, nil)
 	}
 
 	if err := r.addFinalizer(ctx, serviceAccount); err != nil {
@@ -96,7 +96,7 @@ func (r *PixoServiceAccountReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	} else {
 		if user, err = r.createUser(ctx, serviceAccount); err != nil {
-			return ctrl.Result{}, r.HandleStatusUpdate(ctx, serviceAccount, "failed to create pixo user account", user, err)
+			return ctrl.Result{}, r.HandleStatusUpdate(ctx, serviceAccount, "failed to create pixo user account", 0, user, err)
 		}
 		password = user.Password
 		msg = "successfully created user"
@@ -109,10 +109,10 @@ func (r *PixoServiceAccountReconciler) Reconcile(ctx context.Context, req ctrl.R
 	}
 
 	if err = r.addEnvVarsToDeployments(ctx, serviceAccount); err != nil {
-		return ctrl.Result{}, r.HandleStatusUpdate(ctx, serviceAccount, "failed to list deployments", user, err)
+		return ctrl.Result{}, r.HandleStatusUpdate(ctx, serviceAccount, "failed to list deployments", 0, user, err)
 	}
 
-	return ctrl.Result{}, r.HandleStatusUpdate(ctx, serviceAccount, msg, user, err)
+	return ctrl.Result{}, r.HandleStatusUpdate(ctx, serviceAccount, msg, 0, user, err)
 }
 
 func (r *PixoServiceAccountReconciler) HandleUpdate(ctx context.Context, pixoServiceAccount *platformv1.PixoServiceAccount, user *platform.User) error {
@@ -140,9 +140,9 @@ func (r *PixoServiceAccountReconciler) HandleUpdate(ctx context.Context, pixoSer
 
 	if shouldUpdate {
 		if user, err := r.PlatformClient.UpdateUser(ctx, *user); err != nil {
-			return r.HandleStatusUpdate(ctx, pixoServiceAccount, "failed to update user", user, err)
+			return r.HandleStatusUpdate(ctx, pixoServiceAccount, "failed to update user", 0, user, err)
 		}
 	}
 
-	return r.HandleStatusUpdate(ctx, pixoServiceAccount, "updated user", user, nil)
+	return r.HandleStatusUpdate(ctx, pixoServiceAccount, "updated user", 0, user, nil)
 }

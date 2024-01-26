@@ -8,19 +8,24 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (r *PixoServiceAccountReconciler) HandleStatusUpdate(ctx context.Context, serviceAccount *platformv1.PixoServiceAccount, msg string, user *platform.User, err error) error {
+func (r *PixoServiceAccountReconciler) HandleStatusUpdate(ctx context.Context, serviceAccount *platformv1.PixoServiceAccount, msg string, apiKeyID int, user *platform.User, err error) error {
 	retryFunc := func() error {
-		return r.UpdateStatus(ctx, serviceAccount, msg, user, err)
+		return r.UpdateStatus(ctx, serviceAccount, msg, apiKeyID, user, err)
 	}
 
 	return retry.RetryOnConflict(retry.DefaultRetry, retryFunc)
 }
 
-func (r *PixoServiceAccountReconciler) UpdateStatus(ctx context.Context, serviceAccount *platformv1.PixoServiceAccount, msg string, user *platform.User, err error) error {
+func (r *PixoServiceAccountReconciler) UpdateStatus(ctx context.Context, serviceAccount *platformv1.PixoServiceAccount, msg string, apiKeyID int, user *platform.User, err error) error {
 
 	serviceAccount.Log(msg, err)
 
 	update := false
+
+	if apiKeyID != 0 && apiKeyID != serviceAccount.Status.APIKeyID {
+		update = true
+		serviceAccount.Status.APIKeyID = apiKeyID
+	}
 
 	hasNewErr := err != nil && serviceAccount.Status.Error != err.Error()
 	if hasNewErr {
@@ -47,8 +52,6 @@ func (r *PixoServiceAccountReconciler) UpdateStatus(ctx context.Context, service
 	if update {
 		if updateErr := r.Status().Patch(ctx, serviceAccount, client.Merge); updateErr != nil {
 			serviceAccount.Log("failed to update status", updateErr)
-		} else {
-			serviceAccount.Log("updated status", nil)
 		}
 	}
 

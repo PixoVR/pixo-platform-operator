@@ -11,7 +11,7 @@ import (
 func (r *PixoServiceAccountReconciler) addEnvVarsToDeployments(ctx context.Context, serviceAccount *v1.PixoServiceAccount) error {
 	deployments := appsv1.DeploymentList{}
 	if err := r.List(ctx, &deployments, client.InNamespace(serviceAccount.Namespace)); err != nil {
-		return r.HandleStatusUpdate(ctx, serviceAccount, "failed to list deployments", nil, err)
+		return r.HandleStatusUpdate(ctx, serviceAccount, "failed to list deployments", 0, nil, err)
 	}
 
 	for _, deployment := range deployments.Items {
@@ -19,7 +19,7 @@ func (r *PixoServiceAccountReconciler) addEnvVarsToDeployments(ctx context.Conte
 			addOrUpdateEnvVars(&deployment, serviceAccount)
 
 			if err := r.Update(ctx, &deployment); err != nil {
-				return r.HandleStatusUpdate(ctx, serviceAccount, "failed to update deployment with auth creds", nil, err)
+				return r.HandleStatusUpdate(ctx, serviceAccount, "failed to update deployment with auth creds", 0, nil, err)
 			}
 		}
 	}

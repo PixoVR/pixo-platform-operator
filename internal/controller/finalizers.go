@@ -11,7 +11,7 @@ func (r *PixoServiceAccountReconciler) addFinalizer(ctx context.Context, service
 		serviceAccount.SetFinalizers(append(serviceAccount.GetFinalizers(), finalizerName))
 
 		if err := r.Update(ctx, serviceAccount); err != nil {
-			return r.HandleStatusUpdate(ctx, serviceAccount, "failed to add finalizer", nil, err)
+			return r.HandleStatusUpdate(ctx, serviceAccount, "failed to add finalizer", 0, nil, err)
 		}
 	}
 
@@ -22,7 +22,7 @@ func (r *PixoServiceAccountReconciler) removeFinalizer(ctx context.Context, serv
 
 	serviceAccount.SetFinalizers(removeString(serviceAccount.GetFinalizers(), finalizerName))
 	if err := r.Update(ctx, serviceAccount); err != nil {
-		return r.HandleStatusUpdate(ctx, serviceAccount, "failed to remove finalizer", nil, err)
+		return r.HandleStatusUpdate(ctx, serviceAccount, "failed to remove finalizer", 0, nil, err)
 	}
 
 	return nil

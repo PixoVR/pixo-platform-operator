@@ -11,7 +11,7 @@ func (r *PixoServiceAccountReconciler) createUser(ctx context.Context, serviceAc
 
 	user, err := r.PlatformClient.CreateUser(ctx, *input)
 	if err != nil {
-		return nil, r.HandleStatusUpdate(ctx, serviceAccount, "failed to create pixo user account", user, err)
+		return nil, r.HandleStatusUpdate(ctx, serviceAccount, "failed to create pixo user account", 0, user, err)
 	}
 
 	return user, nil

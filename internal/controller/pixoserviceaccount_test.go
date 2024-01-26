@@ -147,12 +147,7 @@ var _ = Describe("Pixoserviceaccount", func() {
 			err = reconciler.Get(ctx, req.NamespacedName, serviceAccount)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("not found"))
-			secret := &corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      fmt.Sprintf("%s-auth", serviceAccount.ObjectMeta.Name),
-					Namespace: serviceAccount.ObjectMeta.Namespace,
-				},
-			}
+			secret := serviceAccount.GenerateAuthSecretSpec()
 			Expect(reconciler.Get(ctx, runtime.ObjectKeyFromObject(secret), secret)).To(HaveOccurred())
 		})
 
@@ -189,8 +184,7 @@ var _ = Describe("Pixoserviceaccount", func() {
 			Expect(err).To(HaveOccurred())
 			Expect(platformClient.CalledDeleteAPIKey).To(BeTrue())
 			Expect(platformClient.CalledDeleteUser).To(BeTrue())
-			err = reconciler.Get(ctx, req.NamespacedName, serviceAccount)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(reconciler.Get(ctx, req.NamespacedName, serviceAccount)).To(Succeed())
 			Expect(serviceAccount.Status.Error).To(Equal("error deleting user"))
 		})
 
@@ -253,6 +247,8 @@ var _ = Describe("Pixoserviceaccount", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(platformClient.CalledCreateAPIKey).To(BeTrue())
 			Expect(platformClient.CalledCreateUser).To(BeFalse())
+			Expect(reconciler.Get(ctx, req.NamespacedName, serviceAccount)).Should(Succeed())
+			Expect(serviceAccount.Status.APIKeyID).NotTo(BeZero())
 		})
 
 	})
