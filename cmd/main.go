@@ -99,7 +99,7 @@ func main() {
 	}
 
 	clientConfig := urlfinder.ClientConfig{
-		Key:       os.Getenv("PIXO_API_KEY"),
+		APIKey:    os.Getenv("PIXO_API_KEY"),
 		Lifecycle: config.GetLifecycle(),
 		Internal:  config.GetLifecycle() != "local",
 	}

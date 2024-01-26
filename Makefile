@@ -183,13 +183,18 @@ container:
 .PHONY: deps
 deps:
 	@echo "🔄 Updating Pixo utilities..."
-	@go get github.com/PixoVR/pixo-golang-clients/pixo-platform@0.0.134
+	@go get github.com/PixoVR/pixo-golang-clients/pixo-platform@0.0.144
 	@go mod tidy
 
 .PHONY: sample
 sample:
 	@echo "Installing Pixo Service Account Sample..."
 	@kubectl apply -k config/samples
+
+.PHONY: sample-undeploy
+sample-undeploy:
+	@echo "Deleting Pixo Service Account Sample..."
+	@kubectl delete -k config/samples
 
 .PHONY: clean
 clean:

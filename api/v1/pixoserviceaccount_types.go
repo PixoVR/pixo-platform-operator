@@ -17,7 +17,11 @@ limitations under the License.
 package v1
 
 import (
+	"fmt"
+	platform "github.com/PixoVR/pixo-golang-clients/pixo-platform/primary-api"
+	"github.com/go-faker/faker/v4"
 	"github.com/rs/zerolog/log"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -72,6 +76,31 @@ func (s *PixoServiceAccount) Log(msg string, err error) {
 		Str("name", s.Name).
 		Str("namespace", s.Namespace).
 		Msg(msg)
+}
+
+func (p *PixoServiceAccount) AuthSecretName() string {
+	return fmt.Sprintf("%s-auth", p.Name)
+}
+
+func (p *PixoServiceAccount) GenerateUserSpec() *platform.User {
+	return &platform.User{
+		Username:  p.Name,
+		Password:  faker.Password() + "!",
+		FirstName: p.Spec.FirstName,
+		LastName:  p.Spec.LastName,
+		Role:      p.Spec.Role,
+		OrgID:     p.Spec.OrgID,
+	}
+}
+
+func (p *PixoServiceAccount) GenerateAuthSecretSpec() *corev1.Secret {
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      p.AuthSecretName(),
+			Namespace: p.Namespace,
+		},
+		Type: corev1.SecretTypeOpaque,
+	}
 }
 
 //+kubebuilder:object:root=true

@@ -18,16 +18,9 @@ package controller
 
 import (
 	"context"
-	"fmt"
 	graphql "github.com/PixoVR/pixo-golang-clients/pixo-platform/graphql-api"
 	platform "github.com/PixoVR/pixo-golang-clients/pixo-platform/primary-api"
-	"github.com/go-faker/faker/v4"
-	"github.com/rs/zerolog/log"
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	platformv1 "pixovr.com/platform/api/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -57,10 +50,8 @@ type PixoServiceAccountReconciler struct {
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.16.3/pkg/reconcile
 func (r *PixoServiceAccountReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+
 	serviceAccount := &platformv1.PixoServiceAccount{}
 	if err := r.Get(ctx, req.NamespacedName, serviceAccount); err != nil {
 		if errors.IsNotFound(err) {
@@ -73,111 +64,55 @@ func (r *PixoServiceAccountReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	if serviceAccount.GetDeletionTimestamp() != nil {
 
-		if err := r.PlatformClient.DeleteAPIKey(ctx, serviceAccount.Status.APIKeyID); err != nil {
-			return ctrl.Result{}, r.UpdateStatus(ctx, serviceAccount, "failed to delete api key", nil, err)
+		if err := r.cleanup(ctx, serviceAccount); err != nil {
+			return ctrl.Result{}, err
 		}
 
-		if err := r.PlatformClient.DeleteUser(ctx, serviceAccount.Status.ID); err != nil {
-			return ctrl.Result{}, r.UpdateStatus(ctx, serviceAccount, "failed to delete user", nil, err)
+		if err := r.removeFinalizer(ctx, serviceAccount); err != nil {
+			return ctrl.Result{}, err
 		}
 
-		secret := &v1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      fmt.Sprintf("%s-auth", req.Name),
-				Namespace: req.Namespace,
-			},
-		}
-		if err := r.Delete(ctx, secret); err != nil {
-			return ctrl.Result{}, r.UpdateStatus(ctx, serviceAccount, "failed to delete auth secret", nil, err)
-		}
-
-		serviceAccount.SetFinalizers(removeString(serviceAccount.GetFinalizers(), finalizerName))
-		if err := r.Update(ctx, serviceAccount); err != nil {
-			return ctrl.Result{}, r.UpdateStatus(ctx, serviceAccount, "failed to remove finalizer", nil, err)
-		}
-
-		return ctrl.Result{}, r.UpdateStatus(ctx, serviceAccount, "deleted user and api key", nil, nil)
+		return ctrl.Result{}, r.HandleStatusUpdate(ctx, serviceAccount, "deleted user and api key", nil, nil)
 	}
 
-	if !containsString(serviceAccount.GetFinalizers(), finalizerName) {
-		serviceAccount.SetFinalizers(append(serviceAccount.GetFinalizers(), finalizerName))
-
-		if err := r.Update(ctx, serviceAccount); err != nil {
-			return ctrl.Result{}, r.UpdateStatus(ctx, serviceAccount, "failed to add finalizer", nil, err)
-		}
+	if err := r.addFinalizer(ctx, serviceAccount); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	var msg string
 	var user *platform.User
 	var err error
+	var password string
 
 	if user, err = r.PlatformClient.GetUserByUsername(ctx, req.Name); err == nil {
 		if err = r.HandleUpdate(ctx, serviceAccount, user); err != nil {
 			return ctrl.Result{}, err
 		}
+
+		secret, err := r.getSecret(ctx, serviceAccount)
+		if err == nil {
+			password = string(secret.Data["password"])
+		}
+
 	} else {
-		input := &platform.User{
-			Username:  req.Name,
-			Password:  faker.Password() + "!",
-			FirstName: serviceAccount.Spec.FirstName,
-			LastName:  serviceAccount.Spec.LastName,
-			Role:      serviceAccount.Spec.Role,
-			OrgID:     serviceAccount.Spec.OrgID,
+		if user, err = r.createUser(ctx, serviceAccount); err != nil {
+			return ctrl.Result{}, r.HandleStatusUpdate(ctx, serviceAccount, "failed to create pixo user account", user, err)
 		}
-		user, err = r.PlatformClient.CreateUser(ctx, *input)
-		if err != nil {
-			return ctrl.Result{}, r.UpdateStatus(ctx, serviceAccount, "failed to create pixo user account", user, err)
-		}
+		password = user.Password
 		msg = "successfully created user"
+	}
 
-		apiKey, err := r.PlatformClient.CreateAPIKey(ctx, platform.APIKey{UserID: user.ID})
-		if err != nil {
-			return ctrl.Result{}, r.UpdateStatus(ctx, serviceAccount, "failed to create api key", user, err)
-		}
-
-		serviceAccount.Status.APIKeyID = apiKey.ID
-		if err = r.UpdateStatus(ctx, serviceAccount, "created api key", user, nil); err != nil {
+	if exists := r.authSecretExists(ctx, serviceAccount); !exists {
+		if err = r.createAPIKey(ctx, serviceAccount, user, password); err != nil {
 			return ctrl.Result{}, err
 		}
-
-		secret := &v1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      fmt.Sprintf("%s-auth", req.Name),
-				Namespace: req.Namespace,
-			},
-			StringData: map[string]string{
-				"username": req.Name,
-				"password": input.Password,
-				"api-key":  apiKey.Key,
-			},
-			Type: v1.SecretTypeOpaque,
-		}
-
-		if err = r.Get(ctx, client.ObjectKeyFromObject(secret), secret); err != nil {
-			if errors.IsNotFound(err) {
-				if err = r.Create(ctx, secret); err != nil {
-					return ctrl.Result{}, r.UpdateStatus(ctx, serviceAccount, "failed to create auth secret", user, err)
-				}
-			}
-		}
 	}
 
-	deployments := appsv1.DeploymentList{}
-	if err = r.List(ctx, &deployments, client.InNamespace(req.Namespace)); err != nil {
-		return ctrl.Result{}, r.UpdateStatus(ctx, serviceAccount, "failed to list deployments", user, err)
+	if err = r.addEnvVarsToDeployments(ctx, serviceAccount); err != nil {
+		return ctrl.Result{}, r.HandleStatusUpdate(ctx, serviceAccount, "failed to list deployments", user, err)
 	}
 
-	for _, deployment := range deployments.Items {
-		if serviceAccountName, ok := deployment.Annotations[AnnotationKey]; ok && serviceAccountName == req.Name {
-			addOrUpdateEnvVars(&deployment, serviceAccountName)
-
-			if err = r.Update(ctx, &deployment); err != nil {
-				return ctrl.Result{}, r.UpdateStatus(ctx, serviceAccount, "failed to update deployment with auth creds", user, err)
-			}
-		}
-	}
-
-	return ctrl.Result{}, r.UpdateStatus(ctx, serviceAccount, msg, user, err)
+	return ctrl.Result{}, r.HandleStatusUpdate(ctx, serviceAccount, msg, user, err)
 }
 
 func (r *PixoServiceAccountReconciler) HandleUpdate(ctx context.Context, pixoServiceAccount *platformv1.PixoServiceAccount, user *platform.User) error {
@@ -205,116 +140,9 @@ func (r *PixoServiceAccountReconciler) HandleUpdate(ctx context.Context, pixoSer
 
 	if shouldUpdate {
 		if user, err := r.PlatformClient.UpdateUser(ctx, *user); err != nil {
-			return r.UpdateStatus(ctx, pixoServiceAccount, "failed to update user", user, err)
+			return r.HandleStatusUpdate(ctx, pixoServiceAccount, "failed to update user", user, err)
 		}
 	}
 
-	return r.UpdateStatus(ctx, pixoServiceAccount, "updated user", user, nil)
-}
-
-func (r *PixoServiceAccountReconciler) UpdateStatus(ctx context.Context, serviceAccount *platformv1.PixoServiceAccount, msg string, user *platform.User, err error) error {
-
-	serviceAccount.Log(msg, err)
-
-	psa := &platformv1.PixoServiceAccount{}
-
-	if getErr := r.Get(ctx, client.ObjectKeyFromObject(serviceAccount), psa); getErr != nil {
-		log.Debug().Msgf("no service account found: %s", getErr.Error())
-		return nil
-	}
-
-	if serviceAccount.Status.APIKeyID != 0 {
-		psa.Status.APIKeyID = serviceAccount.Status.APIKeyID
-	}
-
-	if err != nil {
-		psa.Status.Error = err.Error()
-	} else {
-		psa.Status.Error = ""
-	}
-
-	if user != nil {
-		psa.Status.ID = user.ID
-		psa.Status.Username = user.Username
-		psa.Status.FirstName = user.FirstName
-		psa.Status.LastName = user.LastName
-		psa.Status.OrgID = user.OrgID
-		psa.Status.Role = user.Role
-		psa.Status.Error = ""
-	}
-
-	if updateErr := r.Status().Update(ctx, psa); updateErr != nil {
-		serviceAccount.Log("failed to update status", updateErr)
-	}
-
-	return err
-}
-
-// SetupWithManager sets up the controller with the Manager.
-func removeString(slice []string, s string) []string {
-	var result []string
-	for _, item := range slice {
-		if item != s {
-			result = append(result, item)
-		}
-	}
-	return result
-}
-
-func containsString(slice []string, s string) bool {
-	for _, item := range slice {
-		if item == s {
-			return true
-		}
-	}
-	return false
-}
-
-func addOrUpdateEnvVars(deployment *appsv1.Deployment, serviceAccountName string) {
-	log.Debug().Msgf("updating deployment: %s", deployment.Name)
-
-	envVars := []corev1.EnvVar{
-		{
-			Name:  "PIXO_USERNAME",
-			Value: serviceAccountName,
-		},
-		{
-			Name: "PIXO_PASSWORD",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &v1.SecretKeySelector{
-					LocalObjectReference: v1.LocalObjectReference{
-						Name: fmt.Sprintf("%s-auth", serviceAccountName),
-					},
-					Key: "password",
-				},
-			},
-		},
-		{
-			Name: "PIXO_API_KEY",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &v1.SecretKeySelector{
-					LocalObjectReference: v1.LocalObjectReference{
-						Name: fmt.Sprintf("%s-auth", serviceAccountName),
-					},
-					Key: "api-key",
-				},
-			},
-		},
-	}
-
-	for i, container := range deployment.Spec.Template.Spec.Containers {
-		for _, envVar := range envVars {
-			exists := false
-			for j, existingEnvVar := range container.Env {
-				if existingEnvVar.Name == envVar.Name {
-					exists = true
-					container.Env[j] = envVar
-				}
-			}
-			if !exists {
-				container.Env = append(container.Env, envVar)
-			}
-		}
-		deployment.Spec.Template.Spec.Containers[i] = container
-	}
+	return r.HandleStatusUpdate(ctx, pixoServiceAccount, "updated user", user, nil)
 }

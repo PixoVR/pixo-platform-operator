@@ -93,7 +93,9 @@ var _ = Describe("Pixoserviceaccount", func() {
 			ExpectStatusToEqualSpec(serviceAccount)
 		})
 
-		It("can do nothing if the service account is found but the user already exists", func() {
+		It("should create an api key if the service account is found and the user already exists", func() {
+			_ = CreateTestSecret(ctx, serviceAccount)
+
 			result, err := reconciler.Reconcile(ctx, req)
 
 			Expect(err).NotTo(HaveOccurred())
@@ -105,6 +107,7 @@ var _ = Describe("Pixoserviceaccount", func() {
 		})
 
 		It("can update a user if the service account is found", func() {
+			_ = CreateTestSecret(ctx, serviceAccount)
 			result, err := reconciler.Reconcile(ctx, req)
 
 			Expect(result).To(Equal(ctrl.Result{}))
@@ -214,6 +217,7 @@ var _ = Describe("Pixoserviceaccount", func() {
 		})
 
 		It("should add environment variables even if the user already exists", func() {
+			_ = CreateTestSecret(ctx, serviceAccount)
 			result, err := reconciler.Reconcile(ctx, req)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result).To(Equal(ctrl.Result{}))
@@ -228,6 +232,27 @@ var _ = Describe("Pixoserviceaccount", func() {
 			var updatedDeployment v1.Deployment
 			Expect(reconciler.Get(ctx, runtime.ObjectKeyFromObject(deployment), &updatedDeployment)).Should(Succeed())
 			ExpectEnvVarsToExist(updatedDeployment, serviceAccount)
+		})
+
+		It("should create an api key for a service account that exists but has no api key", func() {
+			platformClient.GetUserError = true
+			result, err := reconciler.Reconcile(ctx, req)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(platformClient.CalledCreateUser).To(BeTrue())
+			Expect(platformClient.CalledCreateAPIKey).To(BeTrue())
+			secretSpec := serviceAccount.GenerateAuthSecretSpec()
+			Expect(k8sClient.Delete(ctx, secretSpec)).To(Succeed())
+
+			platformClient.GetUserError = false
+			platformClient.CalledCreateUser = false
+			platformClient.CalledCreateAPIKey = false
+			result, err = reconciler.Reconcile(ctx, req)
+
+			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(platformClient.CalledCreateAPIKey).To(BeTrue())
+			Expect(platformClient.CalledCreateUser).To(BeFalse())
 		})
 
 	})
@@ -321,4 +346,20 @@ func NewTestDeployment(namespace, name, serviceAccountName string) *v1.Deploymen
 			},
 		},
 	}
+}
+
+func CreateTestSecret(ctx context.Context, serviceAccount *platformv1.PixoServiceAccount) *corev1.Secret {
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-auth", serviceAccount.ObjectMeta.Name),
+			Namespace: serviceAccount.ObjectMeta.Namespace,
+		},
+		StringData: map[string]string{
+			"username": serviceAccount.ObjectMeta.Name,
+			"password": "test-password",
+		},
+		Type: corev1.SecretTypeOpaque,
+	}
+	Expect(k8sClient.Create(ctx, secret)).To(Succeed())
+	return secret
 }
