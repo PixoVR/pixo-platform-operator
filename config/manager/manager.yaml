@@ -70,6 +70,14 @@ spec:
         - /manager
         args:
         - --leader-elect
+        env:
+          - name: LIFECYCLE
+            value: "dev"
+          - name: PIXO_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: pixo-platform-credentials
+                key: api-key
         image: controller:latest
         name: manager
         securityContext:

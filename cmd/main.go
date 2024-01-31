@@ -19,6 +19,8 @@ package main
 import (
 	"flag"
 	graphql "github.com/PixoVR/pixo-golang-clients/pixo-platform/graphql-api"
+	"github.com/PixoVR/pixo-golang-clients/pixo-platform/urlfinder"
+	"github.com/PixoVR/pixo-golang-server-utilities/pixo-platform/config"
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog/log"
 	"os"
@@ -96,11 +98,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	platformClient, err := graphql.NewClientWithBasicAuth(os.Getenv("PIXO_USERNAME"), os.Getenv("PIXO_PASSWORD"), "local", "")
-	if err != nil {
-		setupLog.Error(err, "unable to create graphql client")
-		os.Exit(1)
+	clientConfig := urlfinder.ClientConfig{
+		APIKey:    os.Getenv("PIXO_API_KEY"),
+		Lifecycle: config.GetLifecycle(),
+		Internal:  config.GetLifecycle() != "local",
 	}
+	platformClient := graphql.NewClient(clientConfig)
 
 	if err = (&controller.PixoServiceAccountReconciler{
 		Client:         mgr.GetClient(),
