@@ -99,9 +99,10 @@ func main() {
 	}
 
 	clientConfig := urlfinder.ClientConfig{
+		Internal:  os.Getenv("INTERNAL") == "true",
 		APIKey:    os.Getenv("PIXO_API_KEY"),
 		Lifecycle: config.GetLifecycle(),
-		Internal:  config.GetLifecycle() != "local",
+		Region:    config.GetRegion(),
 	}
 	platformClient := graphql.NewClient(clientConfig)
 
