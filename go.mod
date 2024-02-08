@@ -5,7 +5,7 @@ go 1.21
 require (
 	github.com/PixoVR/pixo-golang-clients/pixo-platform v0.0.0-20240207003404-7af0921fa56c
 	github.com/PixoVR/pixo-golang-server-utilities/pixo-platform v0.0.0-20240125065526-606fcb3d2761
-	github.com/go-faker/faker/v4 v4.2.0
+	github.com/go-faker/faker/v4 v4.2.1
 	github.com/joho/godotenv v1.5.1
 	github.com/onsi/ginkgo/v2 v2.15.0
 	github.com/onsi/gomega v1.31.1
