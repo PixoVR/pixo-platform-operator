@@ -68,9 +68,12 @@ test: manifests generate fmt vet envtest ## Run tests.
 	@echo "🧪 Running tests with coverage..."
 	@KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./... -coverprofile cover.out -covermode atomic -coverpkg ./...
 
-coverage: test
+calc:
 	@echo "🧪 Checking test coverage threshold..."
 	@go-test-coverage --config=./.coverage.yaml
+
+coverage: test calc
+cov: coverage
 
 report:
 	@echo "📊 Generating coverage report..."
