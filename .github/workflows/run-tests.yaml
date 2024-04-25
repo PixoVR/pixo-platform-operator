@@ -30,6 +30,10 @@ jobs:
   test:
     name: Run Tests
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        containers: [1, 2, 3]
     steps:
       - uses: actions/checkout@v4
 
@@ -47,4 +51,4 @@ jobs:
           config: ./.coverage.yaml
 
 permissions:
-  contents: read,write
+  contents: read
