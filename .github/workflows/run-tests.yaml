@@ -46,4 +46,4 @@ jobs:
           config: ./.coverage.yaml
 
 permissions:
-  contents: read
+  contents: write
