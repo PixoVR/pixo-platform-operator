@@ -10,7 +10,7 @@ require (
 	github.com/go-faker/faker/v4 v4.4.1
 	github.com/joho/godotenv v1.5.1
 	github.com/onsi/ginkgo/v2 v2.17.2
-	github.com/onsi/gomega v1.33.0
+	github.com/onsi/gomega v1.33.1
 	github.com/rs/zerolog v1.32.0
 	k8s.io/api v0.30.0
 	k8s.io/apimachinery v0.30.0
