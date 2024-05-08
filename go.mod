@@ -9,7 +9,7 @@ require (
 	github.com/PixoVR/pixo-golang-server-utilities/pixo-platform v0.0.0-20240125065526-606fcb3d2761
 	github.com/go-faker/faker/v4 v4.4.1
 	github.com/joho/godotenv v1.5.1
-	github.com/onsi/ginkgo/v2 v2.17.2
+	github.com/onsi/ginkgo/v2 v2.17.3
 	github.com/onsi/gomega v1.33.1
 	github.com/rs/zerolog v1.32.0
 	k8s.io/api v0.30.0
