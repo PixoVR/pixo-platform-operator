@@ -9,7 +9,7 @@ require (
 	github.com/PixoVR/pixo-golang-server-utilities/pixo-platform v0.0.0-20240125065526-606fcb3d2761
 	github.com/go-faker/faker/v4 v4.4.2
 	github.com/joho/godotenv v1.5.1
-	github.com/onsi/ginkgo/v2 v2.19.0
+	github.com/onsi/ginkgo/v2 v2.19.1
 	github.com/onsi/gomega v1.34.1
 	github.com/rs/zerolog v1.33.0
 	k8s.io/api v0.30.3
@@ -34,7 +34,7 @@ require (
 	github.com/gin-contrib/sse v0.1.0 // indirect
 	github.com/gin-gonic/gin v1.9.1 // indirect
 	github.com/go-jose/go-jose/v3 v3.0.3 // indirect
-	github.com/go-logr/logr v1.4.1 // indirect
+	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/zapr v1.3.0 // indirect
 	github.com/go-openapi/jsonpointer v0.20.0 // indirect
 	github.com/go-openapi/jsonreference v0.20.2 // indirect
