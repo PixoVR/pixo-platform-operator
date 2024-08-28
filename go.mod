@@ -7,7 +7,7 @@ toolchain go1.22.2
 require (
 	github.com/PixoVR/pixo-golang-clients/pixo-platform v0.0.0-20240424185256-826d235789fb
 	github.com/PixoVR/pixo-golang-server-utilities/pixo-platform v0.0.0-20240125065526-606fcb3d2761
-	github.com/go-faker/faker/v4 v4.4.2
+	github.com/go-faker/faker/v4 v4.5.0
 	github.com/joho/godotenv v1.5.1
 	github.com/onsi/ginkgo/v2 v2.20.1
 	github.com/onsi/gomega v1.34.1
