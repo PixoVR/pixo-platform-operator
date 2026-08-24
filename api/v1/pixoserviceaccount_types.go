@@ -18,6 +18,8 @@ package v1
 
 import (
 	"fmt"
+	"strings"
+
 	platform "github.com/PixoVR/pixo-golang-clients/pixo-platform/primary-api"
 	"github.com/go-faker/faker/v4"
 	"github.com/rs/zerolog/log"
@@ -84,9 +86,15 @@ func (p *PixoServiceAccount) AuthSecretName() string {
 	return fmt.Sprintf("%s-auth", p.Name)
 }
 
+// Username is the name of the resource without the hyphens the platform api
+// does not allow in a username.
+func (p *PixoServiceAccount) Username() string {
+	return strings.ReplaceAll(p.Name, "-", "")
+}
+
 func (p *PixoServiceAccount) GenerateUserSpec() *platform.User {
 	return &platform.User{
-		Username:  p.Name,
+		Username:  p.Username(),
 		Password:  faker.Password() + "!",
 		FirstName: p.Spec.FirstName,
 		LastName:  p.Spec.LastName,

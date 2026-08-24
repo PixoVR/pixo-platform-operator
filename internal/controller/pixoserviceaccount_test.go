@@ -118,6 +118,20 @@ var _ = Describe("Pixoserviceaccount", func() {
 			Expect(serviceAccount.Status.Error).To(Equal(""))
 		})
 
+		It("names the user after the service account without its hyphens", func() {
+			platformClient.GetUserError = true
+			hyphenated := NewTestServiceAccount(Namespace, "dev-apex-goapi-service", "superadmin")
+			Expect(k8sClient.Create(ctx, hyphenated)).To(Succeed())
+
+			result, err := reconciler.Reconcile(ctx, NewRequest(hyphenated))
+
+			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(platformClient.CalledCreateUser).To(BeTrue())
+			Expect(reconciler.Get(ctx, runtime.ObjectKeyFromObject(hyphenated), hyphenated)).To(Succeed())
+			Expect(hyphenated.Status.Username).To(Equal("devapexgoapiservice"))
+		})
+
 		It("can do nothing if the service account is found but the user update fails", func() {
 			platformClient.UpdateUserError = true
 
