@@ -84,7 +84,7 @@ func (r *PixoServiceAccountReconciler) Reconcile(ctx context.Context, req ctrl.R
 	var err error
 	var password string
 
-	if user, err = r.PlatformClient.GetUserByUsername(ctx, req.Name); err == nil {
+	if user, err = r.PlatformClient.GetUserByUsername(ctx, serviceAccount.Username()); err == nil {
 		if err = r.HandleUpdate(ctx, serviceAccount, user); err != nil {
 			return ctrl.Result{}, err
 		}
