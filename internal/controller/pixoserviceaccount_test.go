@@ -2,8 +2,9 @@ package controller_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	graphql_api "github.com/PixoVR/pixo-golang-clients/pixo-platform/graphql-api"
+	"github.com/PixoVR/pixo-golang-clients/pixo-platform/platform"
 	"github.com/go-faker/faker/v4"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -23,15 +24,17 @@ var _ = Describe("Pixoserviceaccount", func() {
 	var (
 		ctx            context.Context
 		reconciler     controller.PixoServiceAccountReconciler
-		platformClient *graphql_api.MockGraphQLClient
+		platformClient *platform.MockClient
+		apiClient      *passwordDroppingClient
 	)
 
 	BeforeEach(func() {
 		ctx = context.Background()
-		platformClient = &graphql_api.MockGraphQLClient{}
+		platformClient = &platform.MockClient{}
+		apiClient = &passwordDroppingClient{MockClient: platformClient}
 		reconciler = controller.PixoServiceAccountReconciler{
 			Client:         k8sClient,
-			PlatformClient: platformClient,
+			PlatformClient: apiClient,
 		}
 	})
 
@@ -47,7 +50,7 @@ var _ = Describe("Pixoserviceaccount", func() {
 
 		Expect(result).To(Equal(ctrl.Result{}))
 		Expect(err).NotTo(HaveOccurred())
-		Expect(platformClient.CalledCreateUser).To(BeFalse())
+		Expect(platformClient.NumCalledCreateUser).To(BeZero())
 	})
 
 	Context("when the service account is exists", func() {
@@ -63,34 +66,64 @@ var _ = Describe("Pixoserviceaccount", func() {
 		})
 
 		It("can update the status if user doesnt exist and there is an error creating the user", func() {
-			platformClient.GetUserError = true
-			platformClient.CreateUserError = true
+			platformClient.GetUserByUsernameError = errors.New("user not found")
+			platformClient.CreateUserError = errors.New("error creating user")
 
 			result, err := reconciler.Reconcile(ctx, req)
 
 			Expect(result).To(Equal(ctrl.Result{}))
 			Expect(err).To(HaveOccurred())
-			Expect(platformClient.CalledCreateUser).To(BeTrue())
+			Expect(platformClient.NumCalledCreateUser).To(BeNumerically(">", 0))
 			err = reconciler.Get(ctx, req.NamespacedName, serviceAccount)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(serviceAccount.Status.Error).To(Equal("error creating user"))
 		})
 
+		It("creates the user on a later attempt once the platform accepts it", func() {
+			platformClient.GetUserByUsernameError = errors.New("user not found")
+			platformClient.CreateUserError = errors.New("error creating user")
+			_, err := reconciler.Reconcile(ctx, req)
+			Expect(err).To(HaveOccurred())
+
+			platformClient.CreateUserError = nil
+			result, err := reconciler.Reconcile(ctx, req)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(platformClient.NumCalledCreateUser).To(Equal(2))
+			Expect(platformClient.NumCalledCreateAPIKey).To(Equal(1))
+			Expect(reconciler.Get(ctx, req.NamespacedName, serviceAccount)).To(Succeed())
+			Expect(serviceAccount.Status.ID).To(Equal(1))
+			ExpectStatusToEqualSpec(serviceAccount)
+		})
+
 		It("can create a user if the service account is found", func() {
-			platformClient.GetUserError = true
+			platformClient.GetUserByUsernameError = errors.New("user not found")
 
 			result, err := reconciler.Reconcile(ctx, req)
 
 			Expect(result).To(Equal(ctrl.Result{}))
 			Expect(err).NotTo(HaveOccurred())
-			Expect(platformClient.CalledCreateUser).To(BeTrue())
-			Expect(platformClient.CalledCreateAPIKey).To(BeTrue())
+			Expect(platformClient.NumCalledCreateUser).To(BeNumerically(">", 0))
+			Expect(platformClient.NumCalledCreateAPIKey).To(BeNumerically(">", 0))
 			err = reconciler.Get(ctx, req.NamespacedName, serviceAccount)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(serviceAccount.Status.Error).To(Equal(""))
 			Expect(serviceAccount.Status.ID).To(Equal(1))
 			Expect(serviceAccount.Status.APIKeyID).NotTo(BeZero())
 			ExpectStatusToEqualSpec(serviceAccount)
+		})
+
+		It("stores the password the new user was created with in the auth secret", func() {
+			platformClient.GetUserByUsernameError = errors.New("user not found")
+
+			_, err := reconciler.Reconcile(ctx, req)
+
+			Expect(err).NotTo(HaveOccurred())
+			secret := serviceAccount.GenerateAuthSecretSpec()
+			Expect(reconciler.Get(ctx, runtime.ObjectKeyFromObject(secret), secret)).To(Succeed())
+			Expect(apiClient.createdPassword).NotTo(BeEmpty())
+			Expect(string(secret.Data["password"])).To(Equal(apiClient.createdPassword))
 		})
 
 		It("should create an api key if the service account is found and the user already exists", func() {
@@ -100,7 +133,7 @@ var _ = Describe("Pixoserviceaccount", func() {
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result).To(Equal(ctrl.Result{}))
-			Expect(platformClient.CalledCreateUser).To(BeFalse())
+			Expect(platformClient.NumCalledCreateUser).To(BeZero())
 			err = reconciler.Get(ctx, req.NamespacedName, serviceAccount)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(serviceAccount.Status.Error).To(Equal(""))
@@ -112,27 +145,28 @@ var _ = Describe("Pixoserviceaccount", func() {
 
 			Expect(result).To(Equal(ctrl.Result{}))
 			Expect(err).NotTo(HaveOccurred())
-			Expect(platformClient.CalledUpdateUser).To(BeTrue())
+			Expect(platformClient.NumCalledUpdateUser).To(BeNumerically(">", 0))
+			Expect(platformClient.NumCalledCreateUser).To(BeZero())
 			err = reconciler.Get(ctx, req.NamespacedName, serviceAccount)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(serviceAccount.Status.Error).To(Equal(""))
 		})
 
 		It("can do nothing if the service account is found but the user update fails", func() {
-			platformClient.UpdateUserError = true
+			platformClient.UpdateUserError = errors.New("error updating user")
 
 			result, err := reconciler.Reconcile(ctx, req)
 
 			Expect(err).To(HaveOccurred())
 			Expect(result).To(Equal(ctrl.Result{}))
-			Expect(platformClient.CalledUpdateUser).To(BeTrue())
+			Expect(platformClient.NumCalledUpdateUser).To(BeNumerically(">", 0))
 			err = reconciler.Get(ctx, req.NamespacedName, serviceAccount)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(serviceAccount.Status.Error).To(Equal("error updating user"))
 		})
 
 		It("can delete a user and api key if the service account is deleted", func() {
-			platformClient.GetUserError = true
+			platformClient.GetUserByUsernameError = errors.New("user not found")
 			result, err := reconciler.Reconcile(ctx, req)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result).To(Equal(ctrl.Result{}))
@@ -142,8 +176,8 @@ var _ = Describe("Pixoserviceaccount", func() {
 
 			Expect(result).To(Equal(ctrl.Result{}))
 			Expect(err).NotTo(HaveOccurred())
-			Expect(platformClient.CalledDeleteAPIKey).To(BeTrue())
-			Expect(platformClient.CalledDeleteUser).To(BeTrue())
+			Expect(platformClient.NumCalledDeleteAPIKey).To(BeNumerically(">", 0))
+			Expect(platformClient.NumCalledDeleteUser).To(BeNumerically(">", 0))
 			err = reconciler.Get(ctx, req.NamespacedName, serviceAccount)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("not found"))
@@ -152,49 +186,49 @@ var _ = Describe("Pixoserviceaccount", func() {
 		})
 
 		It("can do nothing but update the status if the service account is deleted but the api key delete fails", func() {
-			platformClient.GetUserError = true
+			platformClient.GetUserByUsernameError = errors.New("user not found")
 			result, err := reconciler.Reconcile(ctx, req)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result).To(Equal(ctrl.Result{}))
 			Expect(reconciler.Delete(ctx, serviceAccount)).To(Succeed())
-			platformClient.DeleteAPIKeyError = true
+			platformClient.DeleteAPIKeyError = errors.New("error deleting api key")
 
 			result, err = reconciler.Reconcile(ctx, req)
 
 			Expect(result).To(Equal(ctrl.Result{}))
 			Expect(err).To(HaveOccurred())
-			Expect(platformClient.CalledDeleteAPIKey).To(BeTrue())
-			Expect(platformClient.CalledDeleteUser).To(BeFalse())
+			Expect(platformClient.NumCalledDeleteAPIKey).To(BeNumerically(">", 0))
+			Expect(platformClient.NumCalledDeleteUser).To(BeZero())
 			err = reconciler.Get(ctx, req.NamespacedName, serviceAccount)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(serviceAccount.Status.Error).To(Equal("error deleting api key"))
 		})
 
 		It("can do nothing but update the status if the service account is deleted but the user delete fails", func() {
-			platformClient.GetUserError = true
+			platformClient.GetUserByUsernameError = errors.New("user not found")
 			result, err := reconciler.Reconcile(ctx, req)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result).To(Equal(ctrl.Result{}))
 			Expect(k8sClient.Delete(ctx, serviceAccount)).To(Succeed())
-			platformClient.DeleteUserError = true
+			platformClient.DeleteUserError = errors.New("error deleting user")
 
 			result, err = reconciler.Reconcile(ctx, req)
 
 			Expect(result).To(Equal(ctrl.Result{}))
 			Expect(err).To(HaveOccurred())
-			Expect(platformClient.CalledDeleteAPIKey).To(BeTrue())
-			Expect(platformClient.CalledDeleteUser).To(BeTrue())
+			Expect(platformClient.NumCalledDeleteAPIKey).To(BeNumerically(">", 0))
+			Expect(platformClient.NumCalledDeleteUser).To(BeNumerically(">", 0))
 			Expect(reconciler.Get(ctx, req.NamespacedName, serviceAccount)).To(Succeed())
 			Expect(serviceAccount.Status.Error).To(Equal("error deleting user"))
 		})
 
 		It("should add environment variables if the correct annotation is present", func() {
-			platformClient.GetUserError = true
+			platformClient.GetUserByUsernameError = errors.New("user not found")
 			result, err := reconciler.Reconcile(ctx, req)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result).To(Equal(ctrl.Result{}))
-			Expect(platformClient.CalledCreateUser).To(BeTrue())
-			Expect(platformClient.CalledCreateAPIKey).To(BeTrue())
+			Expect(platformClient.NumCalledCreateUser).To(BeNumerically(">", 0))
+			Expect(platformClient.NumCalledCreateAPIKey).To(BeNumerically(">", 0))
 			deployment := NewTestDeployment(Namespace, "test-deployment", serviceAccount.ObjectMeta.Name)
 			Expect(reconciler.Create(ctx, deployment)).Should(Succeed())
 
@@ -215,7 +249,7 @@ var _ = Describe("Pixoserviceaccount", func() {
 			result, err := reconciler.Reconcile(ctx, req)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result).To(Equal(ctrl.Result{}))
-			Expect(platformClient.CalledCreateUser).To(BeFalse())
+			Expect(platformClient.NumCalledCreateUser).To(BeZero())
 			deployment := NewTestDeployment(Namespace, "test-deployment-user-exists", serviceAccount.ObjectMeta.Name)
 			Expect(reconciler.Create(ctx, deployment)).Should(Succeed())
 
@@ -229,24 +263,24 @@ var _ = Describe("Pixoserviceaccount", func() {
 		})
 
 		It("should create an api key for a service account that exists but has no api key", func() {
-			platformClient.GetUserError = true
+			platformClient.GetUserByUsernameError = errors.New("user not found")
 			result, err := reconciler.Reconcile(ctx, req)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result).To(Equal(ctrl.Result{}))
-			Expect(platformClient.CalledCreateUser).To(BeTrue())
-			Expect(platformClient.CalledCreateAPIKey).To(BeTrue())
+			Expect(platformClient.NumCalledCreateUser).To(BeNumerically(">", 0))
+			Expect(platformClient.NumCalledCreateAPIKey).To(BeNumerically(">", 0))
 			secretSpec := serviceAccount.GenerateAuthSecretSpec()
 			Expect(k8sClient.Delete(ctx, secretSpec)).To(Succeed())
 
-			platformClient.GetUserError = false
-			platformClient.CalledCreateUser = false
-			platformClient.CalledCreateAPIKey = false
+			platformClient.GetUserByUsernameError = nil
+			platformClient.NumCalledCreateUser = 0
+			platformClient.NumCalledCreateAPIKey = 0
 			result, err = reconciler.Reconcile(ctx, req)
 
 			Expect(result).To(Equal(ctrl.Result{}))
 			Expect(err).NotTo(HaveOccurred())
-			Expect(platformClient.CalledCreateAPIKey).To(BeTrue())
-			Expect(platformClient.CalledCreateUser).To(BeFalse())
+			Expect(platformClient.NumCalledCreateAPIKey).To(BeNumerically(">", 0))
+			Expect(platformClient.NumCalledCreateUser).To(BeZero())
 			Expect(reconciler.Get(ctx, req.NamespacedName, serviceAccount)).Should(Succeed())
 			Expect(serviceAccount.Status.APIKeyID).NotTo(BeZero())
 		})
@@ -254,6 +288,20 @@ var _ = Describe("Pixoserviceaccount", func() {
 	})
 
 })
+
+type passwordDroppingClient struct {
+	*platform.MockClient
+	createdPassword string
+}
+
+func (s *passwordDroppingClient) CreateUser(ctx context.Context, user *platform.User) error {
+	s.createdPassword = user.Password
+	if err := s.MockClient.CreateUser(ctx, user); err != nil {
+		return err
+	}
+	user.Password = ""
+	return nil
+}
 
 func ExpectEnvVarsToExist(deployment v1.Deployment, serviceAccount *platformv1.PixoServiceAccount) {
 	Expect(deployment.Spec.Template.Spec.Containers).To(HaveLen(1))
@@ -278,6 +326,7 @@ func ExpectEnvVarsToContain(deployment v1.Deployment, key string) {
 }
 
 func ExpectStatusToEqualSpec(serviceAccount *platformv1.PixoServiceAccount) {
+	Expect(serviceAccount.Status.Username).To(Equal(serviceAccount.Name))
 	Expect(serviceAccount.Status.FirstName).To(Equal(serviceAccount.Spec.FirstName))
 	Expect(serviceAccount.Status.LastName).To(Equal(serviceAccount.Spec.LastName))
 	Expect(serviceAccount.Status.OrgID).To(Equal(serviceAccount.Spec.OrgID))

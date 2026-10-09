@@ -18,7 +18,7 @@ package v1
 
 import (
 	"fmt"
-	platform "github.com/PixoVR/pixo-golang-clients/pixo-platform/primary-api"
+	"github.com/PixoVR/pixo-golang-clients/pixo-platform/platform"
 	"github.com/go-faker/faker/v4"
 	"github.com/rs/zerolog/log"
 	corev1 "k8s.io/api/core/v1"
@@ -112,11 +112,4 @@ type PixoServiceAccountList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []PixoServiceAccount `json:"items"`
-}
-
-func init() {
-	SchemeBuilder.Register(
-		&PixoServiceAccount{},
-		&PixoServiceAccountList{},
-	)
 }

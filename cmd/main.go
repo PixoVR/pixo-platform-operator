@@ -18,7 +18,7 @@ package main
 
 import (
 	"flag"
-	graphql "github.com/PixoVR/pixo-golang-clients/pixo-platform/graphql-api"
+	"github.com/PixoVR/pixo-golang-clients/pixo-platform/platform"
 	"github.com/PixoVR/pixo-golang-clients/pixo-platform/urlfinder"
 	"github.com/PixoVR/pixo-golang-server-utilities/pixo-platform/config"
 	"github.com/joho/godotenv"
@@ -104,7 +104,7 @@ func main() {
 		Lifecycle: config.GetLifecycle(),
 		Region:    config.GetRegion(),
 	}
-	platformClient := graphql.NewClient(clientConfig)
+	platformClient := platform.NewClient(clientConfig)
 
 	if err = (&controller.PixoServiceAccountReconciler{
 		Client:         mgr.GetClient(),
