@@ -18,8 +18,7 @@ package controller
 
 import (
 	"context"
-	graphql "github.com/PixoVR/pixo-golang-clients/pixo-platform/graphql-api"
-	platform "github.com/PixoVR/pixo-golang-clients/pixo-platform/primary-api"
+	"github.com/PixoVR/pixo-golang-clients/pixo-platform/platform"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	platformv1 "pixovr.com/platform/api/v1"
@@ -39,7 +38,7 @@ const (
 type PixoServiceAccountReconciler struct {
 	client.Client
 	Scheme         *runtime.Scheme
-	PlatformClient graphql.PlatformClient
+	PlatformClient platform.Client
 }
 
 //+kubebuilder:rbac:groups=platform.pixovr.com,resources=pixoserviceaccounts,verbs=get;list;watch;create;update;patch;delete
@@ -139,8 +138,8 @@ func (r *PixoServiceAccountReconciler) HandleUpdate(ctx context.Context, pixoSer
 	}
 
 	if shouldUpdate {
-		if user, err := r.PlatformClient.UpdateUser(ctx, *user); err != nil {
-			return r.HandleStatusUpdate(ctx, pixoServiceAccount, "failed to update user", 0, user, err)
+		if err := r.PlatformClient.UpdateUser(ctx, user); err != nil {
+			return r.HandleStatusUpdate(ctx, pixoServiceAccount, "failed to update user", 0, nil, err)
 		}
 	}
 

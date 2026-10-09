@@ -18,12 +18,12 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.26.8'
 
       - name: Lint
         uses: golangci/golangci-lint-action@v6
         with:
-          version: v1.54
+          version: v1.64.5
           install-mode: "goinstall"
           args: --timeout=30m
 
@@ -40,7 +40,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.26.8'
 
       - name: Run Tests
         run: make test

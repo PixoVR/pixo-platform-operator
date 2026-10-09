@@ -2,7 +2,7 @@ package controller
 
 import (
 	"context"
-	platform "github.com/PixoVR/pixo-golang-clients/pixo-platform/primary-api"
+	"github.com/PixoVR/pixo-golang-clients/pixo-platform/platform"
 	"k8s.io/client-go/util/retry"
 	platformv1 "pixovr.com/platform/api/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
